@@ -3,13 +3,16 @@
 #include <MinHook.h>
 
 // --- CONFIG ---
-bool g_BlockAutoRotate = true;  // Blocks battle camera auto-turn after actions
+bool g_BlockAutoRotate   = true;  // Blocks battle camera auto-turn after actions
+bool g_BlockAutoRecenter = true;  // Blocks camera snapping to tile after actions
 
 uintptr_t g_Base = 0;
 
-// Game function signature
 typedef void (*SetAngle_t)(int angle);
 SetAngle_t oSetAngle = nullptr;
+
+typedef void (*Recenter_t)(uint64_t param_1);
+Recenter_t oRecenter = nullptr;
 
 void LoadConfig() {
     char iniPath[MAX_PATH];
@@ -20,25 +23,29 @@ void LoadConfig() {
 
     if (GetFileAttributesA(iniPath) == INVALID_FILE_ATTRIBUTES) {
         WritePrivateProfileStringA("Camera", "BlockAutoRotate", "1", iniPath);
+        WritePrivateProfileStringA("Camera", "BlockAutoRecenter", "1", iniPath);
     }
-    g_BlockAutoRotate = GetPrivateProfileIntA("Camera", "BlockAutoRotate", 1, iniPath) == 1;
+    g_BlockAutoRotate   = GetPrivateProfileIntA("Camera", "BlockAutoRotate", 1, iniPath) == 1;
+    g_BlockAutoRecenter = GetPrivateProfileIntA("Camera", "BlockAutoRecenter", 1, iniPath) == 1;
 }
 
 // Hook on SetAngle (Game + 0x200530)
 void hkSetAngle(int angle) {
-    // Allow manual rotation (Q / E)
     if ((GetAsyncKeyState('Q') & 0x8000) || (GetAsyncKeyState('E') & 0x8000)) {
         oSetAngle(angle);
         return;
     }
-
-    // Blocking disabled in INI -> allow everything
     if (!g_BlockAutoRotate) {
         oSetAngle(angle);
         return;
     }
+    // Otherwise: engine-initiated rotation -> drop it
+}
 
-    // Otherwise this came from the battle engine (auto-rotate after an action) -> drop it
+// Hook on RecenterOnTile (Game + 0x200588)
+void hkRecenter(uint64_t param_1) {
+    if (g_BlockAutoRecenter) return;  // drop post-action recentering
+    oRecenter(param_1);
 }
 
 DWORD WINAPI InitThread(LPVOID) {
@@ -46,10 +53,13 @@ DWORD WINAPI InitThread(LPVOID) {
     LoadConfig();
 
     if (MH_Initialize() == MH_OK) {
-        void* target = (void*)(g_Base + 0x200530);
-        if (MH_CreateHook(target, (void*)&hkSetAngle, (void**)&oSetAngle) == MH_OK) {
-            MH_EnableHook(target);
-        }
+        void* t1 = (void*)(g_Base + 0x200530);
+        if (MH_CreateHook(t1, (void*)&hkSetAngle, (void**)&oSetAngle) == MH_OK)
+            MH_EnableHook(t1);
+
+        void* t2 = (void*)(g_Base + 0x200588);
+        if (MH_CreateHook(t2, (void*)&hkRecenter, (void**)&oRecenter) == MH_OK)
+            MH_EnableHook(t2);
     }
     return 0;
 }

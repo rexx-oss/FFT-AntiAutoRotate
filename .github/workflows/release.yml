@@ -20,10 +20,13 @@ jobs:
       actions: read
 
     steps:
+      - uses: actions/checkout@v4
+
       # 1. Download existing artifacts from the latest runs
       - name: Download Artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh run download -n AntiAutoRotate-ReloadedII -D reloaded-files
           gh run download -n AntiAutoRotate-ASI -D asi-files

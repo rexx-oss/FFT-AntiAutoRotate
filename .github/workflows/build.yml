@@ -1,4 +1,4 @@
-name: Build FFT FreeCam
+name: Build Standalone Anti-AutoRotate
 
 on:
   push:
@@ -15,11 +15,11 @@ jobs:
     - name: Configure CMake
       run: cmake -B build -S .
 
-    - name: Build ASI
+    - name: Build DLL
       run: cmake --build build --config Release
 
-    - name: Upload Mod Artifact
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: freecam-mod
-        path: build/Release/freecam.asi
+        name: dinput8-anti-autorotate
+        path: build/Release/dinput8.dll

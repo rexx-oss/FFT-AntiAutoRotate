@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure CMake
-        run: cmake -B build -S TEST
+        run: cmake -B build -S Reloaded-II
 
       - name: Build DLL
         run: cmake --build build --config Release

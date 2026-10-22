@@ -10,6 +10,9 @@ SetAngle_t oSetAngle = nullptr;
 typedef void (*Recenter_t)(uint64_t param_1);
 Recenter_t oRecenter = nullptr;
 
+typedef void (*Blend_t)(uint64_t param_1, uint64_t param_2);
+Blend_t oBlend = nullptr;
+
 // Detects manual camera input (Keyboard 'E' OR any mouse drag/movement)
 bool IsManualInput() {
     // 1. Keyboard 'E' (manual 90-degree turn)
@@ -33,7 +36,7 @@ bool IsManualInput() {
     return false;
 }
 
-// Hook SetAngle (Game + 0x200530)
+// 1. Hook SetAngle (Game + 0x200530)
 // Drops battle AI auto-rotations while preserving manual keyboard and mouse rotation
 void hkSetAngle(int angle) {
     if (IsManualInput()) {
@@ -44,9 +47,16 @@ void hkSetAngle(int angle) {
     return;
 }
 
-// Hook RecenterOnTile (Game + 0x200588)
+// 2. Hook RecenterOnTile (Game + 0x200588)
 // Drops camera auto-snapping to units/tiles after actions
 void hkRecenter(uint64_t param_1) {
+    return;
+}
+
+// 3. Hook Blend (Game + 0xe9890)
+// Drops the temporary cinematic camera swing/zoom during attacks and spells
+void hkBlend(uint64_t param_1, uint64_t param_2) {
+    // Drop the cinematic action cutaway completely
     return;
 }
 
@@ -54,11 +64,17 @@ DWORD WINAPI InitThread(LPVOID) {
     g_Base = (uintptr_t)GetModuleHandleA(NULL);
 
     if (MH_Initialize() == MH_OK) {
+        // Block post-action angle changes
         MH_CreateHook((void*)(g_Base + 0x200530), (void*)&hkSetAngle, (void**)&oSetAngle);
         MH_EnableHook((void*)(g_Base + 0x200530));
 
+        // Block post-action tile snaps
         MH_CreateHook((void*)(g_Base + 0x200588), (void*)&hkRecenter, (void**)&oRecenter);
         MH_EnableHook((void*)(g_Base + 0x200588));
+
+        // Block temporary ability/attack cinematic camera swing
+        MH_CreateHook((void*)(g_Base + 0xe9890), (void*)&hkBlend, (void**)&oBlend);
+        MH_EnableHook((void*)(g_Base + 0xe9890));
     }
     return 0;
 }

@@ -19,20 +19,38 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Configure CMake
-      run: cmake -B build -S .
+      # --- 1. Build Original ASI (Root) ---
+      - name: Configure CMake (ASI)
+        run: cmake -B build-asi -S .
 
-    - name: Build ASI
-      run: cmake --build build --config Release
+      - name: Build ASI
+        run: cmake --build build-asi --config Release
 
-    - name: Publish Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.event.inputs.tag_name }}
-        name: ${{ github.event.inputs.release_name }}
-        draft: false
-        prerelease: false
-        files: |
-          build/Release/AntiAutoRotate.asi
+      # --- 2. Build Reloaded-II Mod (TEST) ---
+      - name: Configure CMake (Reloaded-II)
+        run: cmake -B build-reloaded -S TEST
+
+      - name: Build Reloaded-II DLL
+        run: cmake --build build-reloaded --config Release
+
+      # --- 3. Package Reloaded-II Mod ---
+      - name: Package Reloaded-II Mod
+        run: |
+          mkdir package
+          copy build-reloaded\Release\AntiAutoRotate.dll package\
+          copy Reloaded-II\ModConfig.json package\
+          powershell Compress-Archive -Path package\* -DestinationPath AntiAutoRotate-ReloadedII.zip
+
+      # --- 4. Publish Both to Release ---
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: ${{ github.event.inputs.release_name }}
+          draft: false
+          prerelease: false
+          files: |
+            build-asi/Release/AntiAutoRotate.asi
+            AntiAutoRotate-ReloadedII.zip

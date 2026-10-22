@@ -1,0 +1,21 @@
+steps:
+- uses: actions/checkout@v4
+
+- name: Configure CMake
+  run: cmake -B build -S TEST
+
+- name: Build DLL
+  run: cmake --build build --config Release
+
+- name: Package Reloaded Mod
+  run: |
+    mkdir package
+    copy build\Release\AntiAutoRotate.dll package\
+    copy TEST\ModConfig.json package\
+    powershell Compress-Archive -Path package\* -DestinationPath AntiAutoRotate-ReloadedII.zip
+
+- name: Upload Artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: AntiAutoRotate-ReloadedII
+    path: AntiAutoRotate-ReloadedII.zip

@@ -1,0 +1,11 @@
+{
+  "ModId": "fft.antiautorotate",
+  "ModName": "AntiAutoRotate",
+  "ModAuthor": "YourName",
+  "ModVersion": "1.0.0",
+  "ModDescription": "Stops the battle camera from automatically rotating after attacks, spells, and turn changes.",
+  "ModDll": "",
+  "ModNativeDll32": "",
+  "ModNativeDll64": "AntiAutoRotate.dll",
+  "IsUniversalMod": false
+}

@@ -10,9 +10,9 @@ SetAngle_t oSetAngle = nullptr;
 typedef void (*Recenter_t)(uint64_t param_1);
 Recenter_t oRecenter = nullptr;
 
-// Detects whether the user is actively turning via Keyboard OR Mouse
-bool IsManualRotation() {
-    // 1. Keyboard 'E'
+// Detects manual camera input (Keyboard 'E' OR any mouse drag/movement)
+bool IsManualInput() {
+    // 1. Keyboard 'E' (manual 90-degree turn)
     if ((GetAsyncKeyState('E') & 0x8000) != 0) return true;
 
     // 2. Mouse buttons held down (Right, Middle, or Left click drag)
@@ -33,19 +33,19 @@ bool IsManualRotation() {
     return false;
 }
 
-// 1. Hook SetAngle (Game + 0x200530)
-// Allows manual turns from E key AND Mouse, blocks all battle auto-rotations
+// Hook SetAngle (Game + 0x200530)
+// Drops battle AI auto-rotations while preserving manual keyboard and mouse rotation
 void hkSetAngle(int angle) {
-    if (IsManualRotation()) {
+    if (IsManualInput()) {
         oSetAngle(angle);
         return;
     }
-    // Otherwise it's battle AI / after-action auto-turn -> DROP IT!
+    // Drop all automated battle camera turns
     return;
 }
 
-// 2. Hook RecenterOnTile (Game + 0x200588)
-// Drops the camera from auto-snapping to units/tiles after actions
+// Hook RecenterOnTile (Game + 0x200588)
+// Drops camera auto-snapping to units/tiles after actions
 void hkRecenter(uint64_t param_1) {
     return;
 }

@@ -22,29 +22,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Download existing artifacts from the latest runs
+      # 1. Locate and download existing artifacts from previous runs
       - name: Download Artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh run download -n AntiAutoRotate-ReloadedII -D reloaded-files
-          gh run download -n AntiAutoRotate-ASI -D asi-files
+          # Fetch all artifacts currently stored in the repository
+          $response = gh api repos/$env:GH_REPO/actions/artifacts | ConvertFrom-Json
+          Write-Host "Found $($response.total_count) total artifact(s) in repository."
 
-      # 2. Prepare the release files
+          foreach ($art in $response.artifacts) {
+              Write-Host " - Available artifact: '$($art.name)' (from Run ID: $($art.workflow_run.id))"
+          }
+
+          # 1. Download Reloaded-II Artifact
+          $reloaded = $response.artifacts | Where-Object { $_.name -like "*Reloaded*" } | Select-Object -First 1
+          if (-not $reloaded) {
+              Write-Error "Could not find a Reloaded-II artifact. Did you run the 'Reloaded-II Build' workflow first?"
+              exit 1
+          }
+          Write-Host "Downloading Reloaded-II artifact from Run ID $($reloaded.workflow_run.id)..."
+          gh run download $($reloaded.workflow_run.id) -n $($reloaded.name) -D reloaded-files
+
+          # 2. Download ASI Artifact
+          $asi = $response.artifacts | Where-Object { $_.name -like "*ASI*" -or $_.name -eq "AntiAutoRotate" } | Select-Object -First 1
+          if ($asi) {
+              Write-Host "Downloading ASI artifact from Run ID $($asi.workflow_run.id)..."
+              gh run download $($asi.workflow_run.id) -n $($asi.name) -D asi-files
+          } else {
+              Write-Warning "No separate ASI artifact found. Make sure an ASI build workflow has been run."
+          }
+
+      # 2. Stage files for release
       - name: Stage Release Files
         run: |
-          # If Reloaded artifact was already zipped, move it; if it was uploaded as a folder, zip it
+          # Package Reloaded-II into a zip
           if (Test-Path "reloaded-files\AntiAutoRotate-ReloadedII.zip") {
               Move-Item "reloaded-files\AntiAutoRotate-ReloadedII.zip" .\AntiAutoRotate-ReloadedII.zip
-          } else {
+          } elseif (Test-Path "reloaded-files") {
               powershell Compress-Archive -Path reloaded-files\* -DestinationPath AntiAutoRotate-ReloadedII.zip
           }
 
-          # Move the ASI file to the root for release
-          Get-ChildItem -Path asi-files -Filter "AntiAutoRotate.asi" -Recurse | Move-Item -Destination .\AntiAutoRotate.asi
+          # Move the ASI file to root
+          if (Test-Path "asi-files") {
+              Get-ChildItem -Path asi-files -Filter "*.asi" -Recurse | Select-Object -First 1 | Move-Item -Destination .\AntiAutoRotate.asi
+          }
 
-      # 3. Publish both downloaded builds to Release
+      # 3. Publish to GitHub Release
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:

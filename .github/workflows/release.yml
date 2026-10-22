@@ -17,33 +17,31 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      actions: read
 
     steps:
-      - uses: actions/checkout@v4
-
-      # --- 1. Build Original ASI (Root) ---
-      - name: Configure CMake (ASI)
-        run: cmake -B build-asi -S .
-
-      - name: Build ASI
-        run: cmake --build build-asi --config Release
-
-      # --- 2. Build Reloaded-II Mod ---
-      - name: Configure CMake (Reloaded-II)
-        run: cmake -B build-reloaded -S Reloaded-II
-
-      - name: Build Reloaded-II DLL
-        run: cmake --build build-reloaded --config Release
-
-      # --- 3. Package Reloaded-II Mod ---
-      - name: Package Reloaded-II Mod
+      # 1. Download existing artifacts from the latest runs
+      - name: Download Artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir package
-          copy build-reloaded\Release\AntiAutoRotate.dll package\
-          copy Reloaded-II\ModConfig.json package\
-          powershell Compress-Archive -Path package\* -DestinationPath AntiAutoRotate-ReloadedII.zip
+          gh run download -n AntiAutoRotate-ReloadedII -D reloaded-files
+          gh run download -n AntiAutoRotate-ASI -D asi-files
 
-      # --- 4. Publish Both to Release ---
+      # 2. Prepare the release files
+      - name: Stage Release Files
+        run: |
+          # If Reloaded artifact was already zipped, move it; if it was uploaded as a folder, zip it
+          if (Test-Path "reloaded-files\AntiAutoRotate-ReloadedII.zip") {
+              Move-Item "reloaded-files\AntiAutoRotate-ReloadedII.zip" .\AntiAutoRotate-ReloadedII.zip
+          } else {
+              powershell Compress-Archive -Path reloaded-files\* -DestinationPath AntiAutoRotate-ReloadedII.zip
+          }
+
+          # Move the ASI file to the root for release
+          Get-ChildItem -Path asi-files -Filter "AntiAutoRotate.asi" -Recurse | Move-Item -Destination .\AntiAutoRotate.asi
+
+      # 3. Publish both downloaded builds to Release
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
@@ -52,5 +50,5 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            build-asi/Release/AntiAutoRotate.asi
+            AntiAutoRotate.asi
             AntiAutoRotate-ReloadedII.zip

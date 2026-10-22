@@ -28,9 +28,9 @@ jobs:
       - name: Build ASI
         run: cmake --build build-asi --config Release
 
-      # --- 2. Build Reloaded-II Mod (TEST) ---
+      # --- 2. Build Reloaded-II Mod ---
       - name: Configure CMake (Reloaded-II)
-        run: cmake -B build-reloaded -S TEST
+        run: cmake -B build-reloaded -S Reloaded-II
 
       - name: Build Reloaded-II DLL
         run: cmake --build build-reloaded --config Release

@@ -1,11 +1,34 @@
 {
   "ModId": "fft.antiautorotate",
   "ModName": "AntiAutoRotate",
-  "ModAuthor": "YourName",
+  "ModAuthor": "wtfjajaja",
   "ModVersion": "1.0.0",
   "ModDescription": "Stops the battle camera from automatically rotating after attacks, spells, and turn changes.",
   "ModDll": "",
+  "ModIcon": "",
+  "ModR2RManagedDll32": "",
+  "ModR2RManagedDll64": "",
   "ModNativeDll32": "",
   "ModNativeDll64": "AntiAutoRotate.dll",
-  "IsUniversalMod": false
+  "Tags": [],
+  "CanUnload": null,
+  "HasExports": null,
+  "IsLibrary": false,
+  "ReleaseMetadataFileName": "Sewer56.Update.ReleaseMetadata.json",
+  "IgnoreRegexes": [
+    ".*\\.json"
+  ],
+  "IncludeRegexes": [
+    "\\.deps\\.json",
+    "\\.runtimeconfig\\.json",
+    "ModConfig\\.json"
+  ],
+  "PluginData": {},
+  "IsUniversalMod": false,
+  "ModDependencies": [],
+  "OptionalDependencies": [],
+  "SupportedAppId": [
+    "fft_enhanced.exe"
+  ],
+  "ProjectUrl": "https://github.com/rexx-oss/FFT-AntiAutoRotate"
 }

@@ -11,7 +11,7 @@ typedef void (*Recenter_t)(uint64_t param_1);
 Recenter_t oRecenter = nullptr;
 
 // Detects manual camera input (Keyboard 'E' OR any mouse drag/movement)
-bool IsManualRotation() {
+bool IsManualInput() {
     // 1. Keyboard 'E' (manual 90-degree turn)
     if ((GetAsyncKeyState('E') & 0x8000) != 0) return true;
 
@@ -33,10 +33,10 @@ bool IsManualRotation() {
     return false;
 }
 
-// 1. Hook SetAngle (Game + 0x200530)
+// Hook SetAngle (Game + 0x200530)
 // Drops battle AI auto-rotations while preserving manual keyboard and mouse rotation
 void hkSetAngle(int angle) {
-    if (IsManualRotation()) {
+    if (IsManualInput()) {
         oSetAngle(angle);
         return;
     }
@@ -44,7 +44,7 @@ void hkSetAngle(int angle) {
     return;
 }
 
-// 2. Hook RecenterOnTile (Game + 0x200588)
+// Hook RecenterOnTile (Game + 0x200588)
 // Drops camera auto-snapping to units/tiles after actions
 void hkRecenter(uint64_t param_1) {
     return;
@@ -54,11 +54,9 @@ DWORD WINAPI InitThread(LPVOID) {
     g_Base = (uintptr_t)GetModuleHandleA(NULL);
 
     if (MH_Initialize() == MH_OK) {
-        // Block auto-angle changes
         MH_CreateHook((void*)(g_Base + 0x200530), (void*)&hkSetAngle, (void**)&oSetAngle);
         MH_EnableHook((void*)(g_Base + 0x200530));
 
-        // Block tile snap-backs
         MH_CreateHook((void*)(g_Base + 0x200588), (void*)&hkRecenter, (void**)&oRecenter);
         MH_EnableHook((void*)(g_Base + 0x200588));
     }

@@ -1,4 +1,4 @@
-name: Build Camera ASI
+name: Build AntiAutoRotate ASI
 
 on:
   push:
@@ -18,8 +18,8 @@ jobs:
     - name: Build ASI
       run: cmake --build build --config Release
 
-    - name: Upload ASI Artifact
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: freecam-asi
-        path: build/Release/freecam.asi
+        name: AntiAutoRotate-asi
+        path: build/Release/AntiAutoRotate.asi

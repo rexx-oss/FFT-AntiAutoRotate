@@ -3,11 +3,6 @@
 #include <MinHook.h>
 
 uintptr_t g_Base = 0;
-bool g_IsUserRotating = false;
-POINT g_LastMousePos = {0, 0};
-float g_Sensitivity = 2.5f;
-int   g_MaxPitch = 900;
-int   g_MinPitch = 200;
 
 typedef void (*SetAngle_t)(int angle);
 SetAngle_t oSetAngle = nullptr;
@@ -15,95 +10,44 @@ SetAngle_t oSetAngle = nullptr;
 typedef void (*Recenter_t)(uint64_t param_1);
 Recenter_t oRecenter = nullptr;
 
-typedef void (*CameraUpdate_t)(uint64_t p1, uint64_t p2, uint64_t* p3, uint8_t* p4);
-CameraUpdate_t oCameraUpdate = nullptr;
+// Detects whether the user is actively turning via Keyboard OR Mouse
+bool IsManualRotation() {
+    // 1. Keyboard 'E'
+    if ((GetAsyncKeyState('E') & 0x8000) != 0) return true;
 
-// 1. Hook SetAngle: Drops battle AI auto-rotations while allowing manual E & mouse
+    // 2. Mouse buttons held down (Right, Middle, or Left click drag)
+    if ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) return true;
+    if ((GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0) return true;
+    if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) return true;
+
+    // 3. Mouse cursor movement delta
+    POINT cur;
+    if (GetCursorPos(&cur)) {
+        static POINT last = cur;
+        if (cur.x != last.x || cur.y != last.y) {
+            last = cur;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// 1. Hook SetAngle (Game + 0x200530)
+// Allows manual turns from E key AND Mouse, blocks all battle auto-rotations
 void hkSetAngle(int angle) {
-    if (g_IsUserRotating || (GetAsyncKeyState('E') & 0x8000)) {
+    if (IsManualRotation()) {
         oSetAngle(angle);
         return;
     }
-    // Block battle AI auto-turn after actions
+    // Otherwise it's battle AI / after-action auto-turn -> DROP IT!
     return;
 }
 
-// 2. Hook RecenterOnTile: Drops battle camera snaps
+// 2. Hook RecenterOnTile (Game + 0x200588)
+// Drops the camera from auto-snapping to units/tiles after actions
 void hkRecenter(uint64_t param_1) {
     return;
-}
-
-// 3. Synchronous Per-Frame Camera Hook
-void hkCameraUpdate(uint64_t p1, uint64_t p2, uint64_t* p3, uint8_t* p4) {
-    if (p1 == 0) return;
-
-    // Run original game update first
-    oCameraUpdate(p1, p2, p3, p4);
-
-    HWND fgWnd = GetForegroundWindow();
-    char wndTitle[64];
-    GetClassNameA(fgWnd, wndTitle, 64);
-    if (strcmp(wndTitle, "FFTTIC") != 0) return;
-
-    POINT curMouse;
-    GetCursorPos(&curMouse);
-    int dx = curMouse.x - g_LastMousePos.x;
-    int dy = curMouse.y - g_LastMousePos.y;
-    g_LastMousePos = curMouse;
-
-    // Hold Right Mouse Button OR Middle Mouse Button to drag the camera
-    bool rightDown  = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
-    bool middleDown = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
-    bool dragging   = rightDown || middleDown;
-
-    if (dragging) {
-        g_IsUserRotating = true;
-
-        // --- HORIZONTAL ROTATION ---
-        if (dx != 0) {
-            // Use the real dword registers
-            uint32_t* pCurYaw = (uint32_t*)(g_Base + 0xd3a878);
-            uint32_t* pTgtYaw = (uint32_t*)(g_Base + 0xd3a87c);
-            uint32_t* pState  = (uint32_t*)(g_Base + 0xd3a880);
-
-            int deltaYaw = (int)((float)dx * g_Sensitivity);
-            int newYaw = (((int)*pCurYaw + deltaYaw) % 4096 + 4096) % 4096;
-
-            // Update both Current and Target simultaneously so the engine never desyncs
-            *pCurYaw = (uint32_t)newYaw;
-            *pTgtYaw = (uint32_t)newYaw;
-            *pState  = 2; // Active rotating
-
-            // Call the engine's SetAngle to update its internal matrices
-            if (oSetAngle) {
-                oSetAngle(newYaw);
-            }
-        }
-
-        // --- VERTICAL TILT ---
-        if (dy != 0) {
-            uintptr_t camMgr = *(uintptr_t*)(g_Base + 0x3cc96b8);
-            if (camMgr && !IsBadReadPtr((void*)camMgr, 0x25000)) {
-                int16_t* pPitch      = (int16_t*)(camMgr + 0x240dc);
-                float*   pPitchFloat = (float*)(camMgr + 0x2406c);
-
-                int deltaPitch = (int)((float)dy * (g_Sensitivity * 0.8f));
-                int newPitch = (int)*pPitch - deltaPitch;
-
-                if (newPitch > g_MaxPitch) newPitch = g_MaxPitch;
-                if (newPitch < g_MinPitch) newPitch = g_MinPitch;
-
-                *pPitch = (int16_t)newPitch;
-                *pPitchFloat = (float)newPitch;
-            }
-        }
-    } else {
-        if (g_IsUserRotating) {
-            uint32_t* pState = (uint32_t*)(g_Base + 0xd3a880);
-            *pState = 0; // Return to idle cleanly
-            g_IsUserRotating = false;
-        }
-    }
 }
 
 DWORD WINAPI InitThread(LPVOID) {
@@ -115,9 +59,6 @@ DWORD WINAPI InitThread(LPVOID) {
 
         MH_CreateHook((void*)(g_Base + 0x200588), (void*)&hkRecenter, (void**)&oRecenter);
         MH_EnableHook((void*)(g_Base + 0x200588));
-
-        MH_CreateHook((void*)(g_Base + 0xe959d), (void*)&hkCameraUpdate, (void**)&oCameraUpdate);
-        MH_EnableHook((void*)(g_Base + 0xe959d));
     }
     return 0;
 }
